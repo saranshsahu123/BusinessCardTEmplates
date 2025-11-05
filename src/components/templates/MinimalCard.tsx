@@ -1,16 +1,13 @@
 import { QRCodeSVG } from "qrcode.react";
 import { BusinessCardData } from "../BusinessCardForm";
-import { Mail, Phone, Globe, MapPin } from "lucide-react";
 
-interface MinimalCardProps {
-  data: BusinessCardData;
-  fontFamily?: string;
-  fontSize?: number;
-  textColor?: string;
-  accentColor?: string;
-}
-
-export const MinimalCard = ({ data, fontFamily = "Arial, sans-serif", fontSize, textColor = "#000000", accentColor = "#0ea5e9" }: MinimalCardProps) => {
+export const ElegantCard = ({
+  data,
+  fontFamily = "'Poppins', sans-serif",
+  fontSize = 16,
+  textColor = "#ffffff",
+  accentColor = "#0ea5e9",
+}) => {
   const vCardData = `BEGIN:VCARD
 VERSION:3.0
 FN:${data.name}
@@ -24,45 +21,54 @@ END:VCARD`;
 
   return (
     <div
-      className="w-full aspect-[1.75/1] bg-white rounded-lg p-8 flex flex-col justify-between relative overflow-hidden shadow-lg"
-      style={{ fontFamily, fontSize: fontSize ? `${fontSize}px` : '16px', color: textColor }}
+      className="relative w-[370px] h-[210px] rounded-2xl p-6 flex flex-col justify-between overflow-hidden shadow-2xl"
+      style={{
+        background: `linear-gradient(135deg, ${accentColor}, #111827)`,
+        fontFamily,
+        fontSize: `${fontSize}px`,
+        color: textColor,
+      }}
     >
-      <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-primary/10 to-accent/10 rounded-bl-full"></div>
-
-      <div className="relative z-10">
-        <h3 className="text-2xl font-bold mb-1" style={{ color: textColor }}>{data.name || "Your Name"}</h3>
-        <p className="text-sm font-medium mb-1" style={{ color: accentColor }}>{data.title || "Job Title"}</p>
-        <p className="text-xs opacity-80" style={{ color: textColor }}>{data.company || "Company Name"}</p>
+      {/* Background accent shapes */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-white/10 blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-white/10 blur-2xl"></div>
       </div>
 
-      <div className="flex justify-between items-end relative z-10">
-        <div className="space-y-1 text-xs opacity-80" style={{ color: textColor }}>
-          {data.email && (
-            <div className="flex items-center gap-2">
-              <Mail className="w-3 h-3" style={{ color: accentColor }} />
-              <span>{data.email}</span>
-            </div>
-          )}
-          {data.phone && (
-            <div className="flex items-center gap-2">
-              <Phone className="w-3 h-3" style={{ color: accentColor }} />
-              <span>{data.phone}</span>
-            </div>
-          )}
-          {data.website && (
-            <div className="flex items-center gap-2">
-              <Globe className="w-3 h-3" style={{ color: accentColor }} />
-              <span>{data.website}</span>
-            </div>
-          )}
+      {/* Header section */}
+      <div className="relative z-10">
+        <h3 className="text-2xl font-semibold tracking-wide">{data.name || "Your Name"}</h3>
+        <p className="text-sm opacity-80">{data.title || "Job Title"}</p>
+        <p className="text-xs opacity-60 mt-1">{data.company || "Company Name"}</p>
+      </div>
+
+      {/* Divider line */}
+      <div
+        className="w-20 h-[2px] mt-3 mb-2 rounded-full"
+        style={{ backgroundColor: textColor }}
+      ></div>
+
+      {/* Footer section */}
+      <div className="relative z-10 flex justify-between items-end">
+        <div className="text-xs space-y-1 opacity-90">
+          {data.email && <div>{data.email}</div>}
+          {data.phone && <div>{data.phone}</div>}
+          {data.website && <div>{data.website}</div>}
         </div>
 
         {data.name && data.email && (
-          <div className="bg-white p-2 rounded-lg shadow-md">
-            <QRCodeSVG value={vCardData} size={60} />
+          <div className="bg-white/90 p-2 rounded-xl shadow-md">
+            <QRCodeSVG value={vCardData} size={55} />
           </div>
         )}
       </div>
+
+      {/* Company logo watermark */}
+      {data.company && (
+        <div className="absolute bottom-2 right-3 text-4xl font-extrabold opacity-10">
+          {data.company.slice(0, 2).toUpperCase()}
+        </div>
+      )}
     </div>
   );
 };

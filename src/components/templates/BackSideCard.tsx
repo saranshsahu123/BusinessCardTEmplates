@@ -248,69 +248,113 @@ interface Props {
   showLargeQR?: boolean;
 }
 
-export const BackSideCard: React.FC<Props> = ({ data, config, background, textColor, accentColor, fontFamily, fontSize = 15, showLargeQR = true }) => {
-  const appliedAccent = accentColor ?? config?.accentColor ?? "#1f2937";
-  const appliedText = textColor ?? config?.textColor ?? "#0f172a";
+export const BackSideCard: React.FC<Props> = ({
+  data,
+  config,
+  background,
+  textColor,
+  accentColor,
+  fontFamily,
+  fontSize = 15,
+  showLargeQR = true,
+}) => {
+  const appliedAccent = accentColor ?? config?.accentColor ?? "#4f46e5";
+  const appliedText = textColor ?? config?.textColor ?? "#ffffff";
 
   const bgStyle: React.CSSProperties = (() => {
-    const style = config?.bgStyle ?? background?.style ?? "solid";
-    const colors = config?.bgColors ?? background?.colors ?? ["#ffffff"];
+    const style = config?.bgStyle ?? background?.style ?? "gradient";
+    const colors = config?.bgColors ?? background?.colors ?? ["#0f172a", "#1e293b"];
     if (style === "gradient" && colors.length >= 2) {
-      return { background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` };
+      return {
+        background: `linear-gradient(145deg, ${colors[0]}, ${colors[1]})`,
+      };
     }
     return { backgroundColor: colors[0] };
   })();
 
-  const vCardData = `BEGIN:VCARD\nVERSION:3.0\nFN:${data.name}\nTITLE:${data.title}\nORG:${data.company}\nEMAIL:${data.email}\nTEL:${data.phone}\nURL:${data.website}\nADR:${data.address}\nEND:VCARD`;
+  const vCardData = `BEGIN:VCARD
+VERSION:3.0
+FN:${data.name}
+TITLE:${data.title}
+ORG:${data.company}
+EMAIL:${data.email}
+TEL:${data.phone}
+URL:${data.website}
+ADR:${data.address}
+END:VCARD`;
 
   return (
     <div
-      className="w-full aspect-[1.75/1] p-6 relative overflow-hidden shadow-lg rounded-lg"
+      className="w-full aspect-[1.75/1] relative overflow-hidden rounded-2xl shadow-2xl border border-white/10"
       style={{
         ...bgStyle,
         color: appliedText,
-        fontFamily: fontFamily ?? config?.fontFamily ?? "Inter, Arial, sans-serif",
+        fontFamily: fontFamily ?? config?.fontFamily ?? "Poppins, Inter, sans-serif",
         fontSize,
       }}
     >
-      {/* Subtle topo lines */}
-      <div className="absolute inset-0 opacity-10 pointer-events-none">
-        <svg width="100%" height="100%">
-          <defs>
-            <pattern id="topo" width="100" height="100" patternUnits="userSpaceOnUse">
-              <path
-                d="M0,50 C25,0 75,0 100,50 C75,100 25,100 0,50Z"
-                fill="none"
-                stroke={appliedAccent}
-                strokeWidth="1"
-              />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#topo)" />
-        </svg>
+      {/* Subtle radial light glow */}
+      <div
+        className="absolute inset-0 opacity-40"
+        style={{
+          background:
+            "radial-gradient(circle at 30% 30%, rgba(255,255,255,0.15), transparent 70%)",
+        }}
+      ></div>
+
+      {/* Decorative gradient stripes */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div
+          className="absolute top-0 left-0 w-[120%] h-1 bg-gradient-to-r from-transparent via-white/30 to-transparent rotate-2"
+          style={{ filter: "blur(1px)" }}
+        ></div>
+        <div
+          className="absolute bottom-0 right-0 w-[120%] h-1 bg-gradient-to-r from-transparent via-white/30 to-transparent -rotate-2"
+          style={{ filter: "blur(1px)" }}
+        ></div>
       </div>
 
-      <div className="relative z-10 flex flex-col items-center justify-center h-full">
-        <div style={{ textAlign: "center" }}>
+      {/* Glass overlay card */}
+      <div className="absolute inset-4 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 flex flex-col items-center justify-center text-center p-6 z-10">
+        {/* Contact Info */}
+        <div className="space-y-2 mb-4">
           {data.email && (
-            <div><strong style={{ color: appliedAccent }}>✉</strong> {data.email}</div>
+            <div className="text-sm tracking-wide">
+              <span style={{ color: appliedAccent }}>✉ </span>
+              {data.email}
+            </div>
           )}
           {data.phone && (
-            <div><strong style={{ color: appliedAccent }}>✆</strong> {data.phone}</div>
+            <div className="text-sm tracking-wide">
+              <span style={{ color: appliedAccent }}>☎ </span>
+              {data.phone}
+            </div>
           )}
           {data.website && (
-            <div><strong style={{ color: appliedAccent }}>⌂</strong> {data.website}</div>
+            <div className="text-sm tracking-wide">
+              <span style={{ color: appliedAccent }}>🌐 </span>
+              {data.website}
+            </div>
           )}
           {data.address && (
-            <div><strong style={{ color: appliedAccent }}>📍</strong> {data.address}</div>
+            <div className="text-sm tracking-wide opacity-90">
+              <span style={{ color: appliedAccent }}>📍 </span>
+              {data.address}
+            </div>
           )}
         </div>
 
+        {/* QR Code Section */}
         {showLargeQR && (data.email || data.phone) && (
-          <div style={{ marginTop: 14, background: "rgba(255,255,255,0.9)", padding: 8, borderRadius: 8 }}>
-            <QRCodeSVG value={vCardData} size={96} />
+          <div className="bg-white/90 p-3 rounded-xl shadow-md mt-3 hover:scale-105 transition-transform duration-300">
+            <QRCodeSVG value={vCardData} size={90} />
           </div>
         )}
+
+        {/* Subtle footer text */}
+        <div className="mt-4 text-xs text-white/60 font-light tracking-widest">
+          {data.company ? data.company.toUpperCase() : "YOUR COMPANY"}
+        </div>
       </div>
     </div>
   );

@@ -1,11 +1,23 @@
-import { useState, useRef } from "react";
+//
+// 💡 FILE 3: components/TemplateSelector.tsx
+// (This fixes the crash and uses the correct ClassicCard component)
+//
+
+import { useState, useRef, useEffect } from "react"; // <-- Import useEffect
 import { BusinessCardData } from "./BusinessCardForm";
-import { ClassicCard } from "./templates/ClassicCard";
+import { ClassicCard } from "./templates/ClassicCard"; // <-- Using the correct ClassicCard
 import { Check, Download } from "lucide-react";
 import { downloadAsImage } from "@/lib/utils";
 import { Button } from "./ui/button";
-import { classicTemplates } from "@/lib/classicTemplates";
-import { BackSideCard } from "./templates/BackSideCard";
+import {
+  generateClassicTemplates,
+  ClassicTemplate,
+  ClassicSideConfig, // <-- Import this type
+} from "@/lib/classicTemplates";
+import clsx from "clsx"; 
+
+// --- Generate 50+ templates ---
+const templates = generateClassicTemplates(50);
 
 interface TemplateSelectorProps {
   data: BusinessCardData;
@@ -15,143 +27,175 @@ interface TemplateSelectorProps {
   accentColor?: string;
 }
 
-const templates = classicTemplates;
-
 export const TemplateSelector = ({
   data,
-  selectedFont = "Arial, sans-serif",
-  fontSize = 16,
-  textColor = "#000000",
-  accentColor = "#0ea5e9"
+  selectedFont,
+  fontSize,
+  textColor,
+  accentColor,
 }: TemplateSelectorProps) => {
-  const [selectedTemplate, setSelectedTemplate] = useState(templates[0]?.id ?? "classic-001");
-  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  // --- FIX: Initialize state with null, then set it to prevent crash ---
+  const [selectedTemplate, setSelectedTemplate] = useState<ClassicTemplate | null>(null);
+  
+  useEffect(() => {
+    // Set the initial template only after the component mounts
+    if (templates.length > 0) {
+      setSelectedTemplate(templates[0]);
+    }
+  }, []); // Empty dependency array ensures this runs only once
+
   const previewRef = useRef<HTMLDivElement>(null);
   const backRef = useRef<HTMLDivElement>(null);
-  const selectedConfig = templates.find((t) => t.id === selectedTemplate) || templates[0];
 
-  const defaultFont = "Arial, sans-serif";
-  const defaultFontSize = 16;
-  const defaultText = "#000000";
-  const defaultAccent = "#0ea5e9";
   const hasOverrides =
-    selectedFont !== defaultFont ||
-    fontSize !== defaultFontSize ||
-    textColor !== defaultText ||
-    accentColor !== defaultAccent;
+    selectedFont || fontSize || textColor || accentColor;
+
+  // Create a new config object with user overrides applied
+  const getOverriddenConfig = (config?: ClassicSideConfig): ClassicSideConfig | undefined => {
+    if (!config) return undefined; // Guard against undefined config
+    return {
+      ...config,
+      ...(selectedFont && { fontFamily: selectedFont }), // <-- Fixed 'fontFamily' is not defined error
+      ...(fontSize && { fontSize: fontSize }),
+      ...(textColor && { textColor: textColor }),
+      ...(accentColor && { accentColor: accentColor }),
+    };
+  };
+
+  // --- FIX: Add a loading state if selectedTemplate is not ready ---
+  if (!selectedTemplate) {
+    return (
+      <div className="flex justify-center items-center h-96">
+        <p>Loading templates...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="bg-card rounded-xl p-6 shadow-[var(--shadow-card)] border border-border animate-fade-in [animation-delay:0.1s] opacity-0 [animation-fill-mode:forwards]">
+      {/* --- Selected Design Preview (Front & Back) --- */}
+      <div className="bg-card rounded-xl p-6 shadow-sm border border-border animate-fade-in [animation-delay:0.1s] opacity-0 [animation-fill-mode:forwards]">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-bold text-foreground">Selected Design Preview</h2>
+          <h2 className="text-2xl font-bold text-foreground">
+            Selected Design Preview
+          </h2>
           <div className="flex items-center gap-2">
             <Button
-              onClick={() => previewRef.current && downloadAsImage(previewRef.current, `${selectedTemplate}-front`)}
-              variant="outline"
-              size="sm"
-              className="gap-2"
+              onClick={() =>
+                previewRef.current &&
+                downloadAsImage(previewRef.current, `${selectedTemplate.id}-front`)
+              }
+              variant="outline" size="sm" className="gap-2"
             >
-              <Download className="w-4 h-4" />
-              Download Front
+              <Download className="w-4 h-4" /> Download Front
             </Button>
             <Button
-              onClick={() => backRef.current && downloadAsImage(backRef.current, `${selectedTemplate}-back`)}
-              variant="outline"
-              size="sm"
-              className="gap-2"
+              onClick={() =>
+                backRef.current &&
+                downloadAsImage(backRef.current, `${selectedTemplate.id}-back`)
+              }
+              variant="outline" size="sm" className="gap-2"
             >
-              <Download className="w-4 h-4" />
-              Download Back
+              <Download className="w-4 h-4" /> Download Back
             </Button>
           </div>
         </div>
         <div className="bg-gradient-to-br from-muted to-background p-8 rounded-lg">
           <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-6">
-            <div ref={previewRef}>
-              {selectedConfig && (
-                <ClassicCard
-                  data={data}
-                  config={selectedConfig}
-                  fontFamily={hasOverrides ? selectedFont : undefined}
-                  fontSize={hasOverrides ? fontSize : undefined}
-                  textColor={hasOverrides ? textColor : undefined}
-                  accentColor={hasOverrides ? accentColor : undefined}
-                />
+            
+            {/* --- Preview wrapper now controls aspect ratio --- */}
+            <div 
+              ref={previewRef}
+              className={clsx(
+                "rounded-xl overflow-hidden shadow-lg",
+                selectedTemplate.front.orientation === 'horizontal' 
+                  ? "aspect-[1.75/1]" 
+                  : "aspect-[1/1.75]"
               )}
+            >
+              <ClassicCard
+                data={data}
+                config={getOverriddenConfig(selectedTemplate.front)!}
+              />
             </div>
-            <div ref={backRef}>
-              {selectedConfig && (
-                <BackSideCard
-                  data={data}
-                  background={{
-                    style: selectedConfig.bgStyle === "solid" ? "solid" : "gradient",
-                    colors: selectedConfig.bgColors,
-                  }}
-                  textColor={hasOverrides ? (textColor ?? selectedConfig.textColor) : selectedConfig.textColor}
-                  accentColor={hasOverrides ? (accentColor ?? selectedConfig.accentColor) : selectedConfig.accentColor}
-                  fontFamily={hasOverrides ? selectedFont : undefined}
-                  fontSize={hasOverrides ? fontSize : undefined}
-                />
+            
+            {/* --- Preview wrapper now controls aspect ratio --- */}
+            <div 
+              ref={backRef}
+              className={clsx(
+                "rounded-xl overflow-hidden shadow-lg",
+                selectedTemplate.back.orientation === 'horizontal' 
+                  ? "aspect-[1.75/1]" 
+                  : "aspect-[1/1.75]"
               )}
+            >
+              <ClassicCard
+                data={data}
+                config={getOverriddenConfig(selectedTemplate.back)!}
+              />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-card rounded-xl p-6 shadow-[var(--shadow-card)] border border-border animate-fade-in [animation-delay:0.4s] opacity-0 [animation-fill-mode:forwards]">
-        <h2 className="text-2xl font-bold mb-4 text-foreground">Choose Template</h2>
-        {templates.length === 0 ? (
-          <div className="text-sm text-muted-foreground">No classic templates available.</div>
-        ) : (
+      {/* --- Choose Template Grid (NOW WITH FLIPPERS) --- */}
+      <div className="bg-card rounded-xl p-6 shadow-sm border border-border animate-fade-in [animation-delay:0.4s] opacity-0 [animation-fill-mode:forwards]">
+        <h2 className="text-2xl font-bold mb-4 text-foreground">
+          Choose Template ({templates.length} Options)
+        </h2>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
           {templates.map((template) => {
+            const isSelected = selectedTemplate.id === template.id;
             return (
-              <div key={template.id} className="relative">
-                <button
-                  onClick={() => setSelectedTemplate(template.id)}
-                  className={`group relative rounded-lg overflow-hidden transition-all duration-300 border-2 ${
-                    selectedTemplate === template.id
-                      ? "border-primary shadow-[var(--shadow-hover)]"
-                      : "border-border hover:border-primary/50 hover:shadow-[var(--shadow-card)]"
-                  }`}
-                >
-                  {selectedTemplate === template.id && (
-                    <div className="absolute top-2 right-2 z-10 bg-primary text-primary-foreground rounded-full p-1">
-                      <Check className="w-4 h-4" />
-                    </div>
+              <div
+                key={template.id}
+                className="relative group cursor-pointer"
+                onClick={() => setSelectedTemplate(template)}
+              >
+                {/* --- This wrapper is a square to fix the "messy" grid --- */}
+                <div
+                  className={clsx(
+                    "relative w-full aspect-square rounded-xl overflow-hidden [perspective:1000px] border-2 transition-all",
+                    isSelected
+                      ? "border-primary shadow-lg"
+                      : "border-border hover:border-primary/50"
                   )}
-                  <div
-                    ref={(el) => {
-                      cardRefs.current[template.id] = el;
-                    }}
-                    className="pointer-events-none aspect-[1.75/1] w-full"
-                  >
-                    <ClassicCard
-                      data={data}
-                      config={template}
-                      fontFamily={hasOverrides ? selectedFont : undefined}
-                      fontSize={hasOverrides ? fontSize : undefined}
-                      textColor={hasOverrides ? textColor : undefined}
-                      accentColor={hasOverrides ? accentColor : undefined}
-                    />
-                  </div>
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-3">
-                    <p className="text-white font-medium text-sm">{template.name}</p>
-                  </div>
-                </button>
-                <button
-                  onClick={() => cardRefs.current[template.id] && downloadAsImage(cardRefs.current[template.id] as HTMLElement, template.name)}
-                  className="absolute top-2 left-2 z-10 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Download template"
                 >
-                  <Download className="w-4 h-4" />
-                </button>
+                  <div
+                    className="relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]"
+                  >
+                    {/* --- Card Front --- */}
+                    <div className="absolute w-full h-full [backface-visibility:hidden]">
+                      <ClassicCard
+                        data={data}
+                        config={getOverriddenConfig(template.front)!}
+                      />
+                    </div>
+                    {/* --- Card Back --- */}
+                    <div className="absolute w-full h-full [backface-visibility:hidden] [transform:rotateY(180deg)]">
+                      <ClassicCard
+                        data={data}
+                        config={getOverriddenConfig(template.back)!}
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                {/* --- Selected Checkmark --- */}
+                {isSelected && (
+                  <div className="absolute top-2 right-2 z-10 bg-primary text-primary-foreground rounded-full p-1">
+                    <Check className="w-4 h-4" />
+                  </div>
+                )}
+                
+                {/* --- Template Name --- */}
+                <p className="text-sm text-center font-medium text-muted-foreground mt-2 truncate" title={template.name}>
+                  {template.name}
+                </p>
               </div>
             );
           })}
         </div>
-        )}
       </div>
     </div>
   );

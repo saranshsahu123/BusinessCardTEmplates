@@ -5,38 +5,96 @@ import { Button } from "./ui/button";
 import { Loader2, Sparkles, Check, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { generateDesigns } from "@/services/designService";
-import { downloadAsImage } from "@/lib/utils";
+
+// --- UPDATED IMPORTS ---
+import { downloadAsImage, getContrastingTextColor } from "@/lib/utils";
+
+// --- UPDATED TEMPLATE CARD ---
+// This component now renders a 3D flipper card
 
 interface TemplateCardProps {
-  design: any;
+  design: any; // This will now have 'front' and 'back' properties
   index: number;
   selectedDesignId?: string;
   onSelectTemplate: (designConfig: any) => void;
   data: BusinessCardData;
 }
 
-const TemplateCard = ({ design, index, selectedDesignId, onSelectTemplate, data }: TemplateCardProps): JSX.Element => {
+const TemplateCard = ({
+  design,
+  index,
+  selectedDesignId,
+  onSelectTemplate,
+  data,
+}: TemplateCardProps): JSX.Element => {
   const cardRef = useRef<HTMLDivElement>(null);
 
-  const handleDownload = (e: React.MouseEvent) => {
+  // Updated download handler for front/back
+  const handleDownload = (e: React.MouseEvent, side: "front" | "back") => {
     e.stopPropagation();
-    if (cardRef.current) {
-      downloadAsImage(cardRef.current, `business-card-${design.id}.png`);
+    const node = cardRef.current?.querySelector(`.card-${side}`);
+    if (node) {
+      downloadAsImage(
+        node as HTMLElement,
+        `business-card-${design.id}-${side}.png`
+      );
     }
   };
 
-  return (
-    <div className="relative group cursor-pointer" onClick={() => onSelectTemplate(design)}>
-      <div ref={cardRef} className="aspect-[1.75/1]">
-        <DynamicCard data={data} designConfig={design} />
+  // Check if design has the new front/back structure
+  if (!design.front || !design.back) {
+    console.warn("Invalid design format received from AI", design);
+    return (
+      <div className="aspect-[1.75/1] bg-muted rounded-lg p-2 text-xs text-destructive-foreground">
+        Invalid AI design format
       </div>
+    );
+  }
+
+  return (
+    <div
+      className="relative group cursor-pointer aspect-[1.75/1] [perspective:1000px]"
+      onClick={() => onSelectTemplate(design)}
+    >
+      {/* --- Card Flipper Container --- */}
+      <div
+        ref={cardRef}
+        className="relative w-full h-full transition-transform duration-700 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]"
+      >
+        {/* --- Card Front --- */}
+        <div className="absolute w-full h-full [backface-visibility:hidden] card-front">
+          <DynamicCard data={data} designConfig={design.front} />
+        </div>
+
+        {/* --- Card Back --- */}
+        <div className="absolute w-full h-full [backface-visibility:hidden] [transform:rotateY(180deg)] card-back">
+          <DynamicCard data={data} designConfig={design.back} />
+        </div>
+      </div>
+
+      {/* --- Selection & Download UI --- */}
       {selectedDesignId === design.id && (
         <>
-          <div className="absolute top-2 left-2">
-            <Check className="w-4 h-4 text-green-500 bg-white rounded-full p-1" />
+          <div className="absolute top-2 left-2 z-20">
+            <Check className="w-5 h-5 text-green-500 bg-white rounded-full p-1 shadow-lg" />
           </div>
-          <div className="absolute top-2 right-2">
-            <Button size="sm" onClick={handleDownload} variant="secondary">
+          <div className="absolute top-2 right-2 z-20 flex flex-col gap-2">
+            <Button
+              size="sm"
+              onClick={(e) => handleDownload(e, "front")}
+              variant="secondary"
+              title="Download Front"
+            >
+              <Download className="w-4 h-4" />
+            </Button>
+            {/* Show back download on hover */}
+            <Button
+              size="sm"
+              onClick={(e) => handleDownload(e, "back")}
+              variant="secondary"
+              title="Download Back"
+              className="opacity-0 group-hover:opacity-100 transition-opacity"
+            >
               <Download className="w-4 h-4" />
             </Button>
           </div>
@@ -46,49 +104,84 @@ const TemplateCard = ({ design, index, selectedDesignId, onSelectTemplate, data 
   );
 };
 
+// --- UPDATED GALLERY COMPONENT ---
+
 interface AITemplateGalleryProps {
   data: BusinessCardData;
   onSelectTemplate: (designConfig: any) => void;
   selectedDesignId?: string;
 }
 
-export const AITemplateGallery = ({ data, onSelectTemplate, selectedDesignId }: AITemplateGalleryProps) => {
+/**
+ * Helper to process and apply guardrails to a single card side config
+ */
+const processCardSide = (sideConfig: any, defaultAccent: string) => {
+  const primaryBg = sideConfig.bgColors?.[0] || "#ffffff";
+  const readableText = getContrastingTextColor(primaryBg);
+
+  return {
+    bgStyle: sideConfig.bgStyle || "solid",
+    bgColors: Array.isArray(sideConfig.bgColors)
+      ? sideConfig.bgColors
+      : ["#ffffff", "#f0f0f0"],
+    textColor: readableText, // <-- FIX: Force readable text
+    accentColor: sideConfig.accentColor || defaultAccent,
+    layout: sideConfig.layout || "logo-centric-front",
+    decoration: sideConfig.decoration || "none",
+    fontWeight: sideConfig.fontWeight || "normal",
+    fontFamily: sideConfig.fontFamily || "Arial",
+    borderStyle: sideConfig.borderStyle || "none",
+  };
+};
+
+export const AITemplateGallery = ({
+  data,
+  onSelectTemplate,
+  selectedDesignId,
+}: AITemplateGalleryProps) => {
   const [designs, setDesigns] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-    const requestDesigns = async (count: number = 100) => {
+  const requestDesigns = async (count: number = 100) => {
     setIsLoading(true);
     try {
       const designs = await generateDesigns(count, data);
-      
-      // Process and validate the designs
+
       if (!Array.isArray(designs)) {
-        throw new Error('Invalid response format from AI service');
+        throw new Error("Invalid response format from AI service");
       }
 
-      const processedDesigns = designs.map((design: any, index: number) => ({
-        id: design.id || `design-${index}`,
-        name: design.name || `Design ${index + 1}`,
-        bgStyle: design.bgStyle || 'gradient',
-        bgColors: Array.isArray(design.bgColors) ? design.bgColors : ['#ffffff', '#f0f0f0'],
-        textColor: design.textColor || '#000000',
-        accentColor: design.accentColor || '#0ea5e9',
-        layout: design.layout || 'centered',
-        decoration: design.decoration || 'none',
-        fontWeight: design.fontWeight || 'normal',
-        fontFamily: design.fontFamily || 'Arial',
-        borderStyle: design.borderStyle || 'none'
-      }));
+      // --- UPDATED PROCESSING LOGIC ---
+      // This now processes the new front/back structure
+
+      const processedDesigns = designs.map((design: any, index: number) => {
+        const defaultAccent = `#${Math.floor(Math.random() * 16777215).toString(16)}`;
+
+        return {
+          id: design.id || `design-${index}`,
+          name: design.name || `Design ${index + 1}`,
+          // Process front and back sides independently
+          front: processCardSide(
+            design.front || {},
+            design.back?.accentColor || defaultAccent
+          ),
+          back: processCardSide(
+            design.back || {},
+            design.front?.accentColor || defaultAccent
+          ),
+        };
+      });
+      // --- END OF UPDATED LOGIC ---
 
       setDesigns(processedDesigns);
 
       toast({
         title: "Success!",
-        description: `Generated ${processedDesigns.length} unique business card designs`,
+        description: `Generated ${processedDesigns.length} unique designs`,
       });
     } catch (error: any) {
-      console.error('Error generating designs:', error);
+      console.error("Error generating designs:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -101,7 +194,7 @@ export const AITemplateGallery = ({ data, onSelectTemplate, selectedDesignId }: 
 
   useEffect(() => {
     requestDesigns(100);
-  }, []);
+  }, []); // Note: 'data' is not in dependency array, generation is manual
 
   return (
     <div className="space-y-6">
